@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>ReproForge · Local demo</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <span class="mark">R</span> ReproForge
+        <span class="tag">LOCAL DEMO</span>
+      </header>
+      <p class="eyebrow">CAPTURE. REPRODUCE. PREVENT.</p>
+      <h1>One bug.<br />One test. A verified fix.</h1>
+      <p>
+        Submit a synthetic monthly investment. The buggy validator returns
+        <code>422</code>; the corrected validator returns <code>201</code>.
+      </p>
+      <section>
+        <div class="row">
+          <h2>Create an investment</h2>
+          <span id="mode">Connecting…</span>
+        </div>
+        <form id="investment">
+          <label>Test symbol<input value="DEMO" readonly /></label>
+          <div class="fields">
+            <label>Amount<input value="100" readonly /></label
+            ><label>Currency<input value="USD" readonly /></label>
+          </div>
+          <label>Schedule<input value="monthly" readonly /></label
+          ><button type="submit">Submit synthetic investment →</button>
+        </form>
+        <pre id="result" role="status">
+Ready. Open DevTools → ReproForge, then submit.</pre>
+      </section>
+      <footer>
+        No account. No real money. No persistent data.<br />Switch modes by
+        restarting the server with npm run demo:fixed.
+      </footer>
+    </main>
+    <script src="/demo.js"></script>
+  </body>
+</html>
