@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "ReproForge",
   "description": "Capture failed API requests in DevTools and export sanitized, developer-approved regression tests.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "minimum_chrome_version": "120",
   "devtools_page": "devtools.html",
   "icons": {
@@ -12,6 +12,7 @@
     "128": "icons/icon128.png"
   },
   "content_security_policy": {
-    "extension_pages": "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none';"
-  }
+    "extension_pages": "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src http://127.0.0.1:*; object-src 'none'; base-uri 'none';"
+  },
+  "optional_host_permissions": ["http://127.0.0.1/*"]
 }

@@ -62,7 +62,7 @@ Verified on **2026-10-29**, Ubuntu Linux, Node **24.22.1**, npm **11.19.1**, and
 | Boundary                       | Evidence                                                                                         |
 | ------------------------------ | ------------------------------------------------------------------------------------------------ |
 | Static checking                | TypeScript strict mode and ESLint pass                                                           |
-| Unit/integration suite         | 26 tests across 4 files pass                                                                     |
+| Unit/integration suite         | 61 tests across 10 files pass                                                                    |
 | MV3 build                      | Both entry points, manifest, bundled JS/CSS and four PNG icons validate                          |
 | Genuine DevTools capture       | Browser test loads the extension, captures the demo POST, inspects response and generates a test |
 | Export                         | Exact-file review gate and actual ZIP download pass                                              |
@@ -79,7 +79,7 @@ Evidence files (generated, ignored by Git):
 - `artifacts/browser-downloads/reproforge-regression.zip`: browser-exported project.
 - `artifacts/red-green.txt`: compile and red/green result summary.
 - `artifacts/buggy-test.log` and `artifacts/fixed-test.log`: actual Vitest output.
-- `artifacts/reproforge-0.1.0.zip`: packaged extension.
+- `artifacts/reproforge-0.2.0.zip`: packaged extension.
 
 The initial sandbox denied localhost binding (`listen EPERM`); integration and browser verification were subsequently run with loopback/process access. This was an execution-environment limitation, not a mocked passing result.
 
@@ -95,6 +95,35 @@ Automated Chromium verification does not install into your personal Google Chrom
 6. Check unsupported request formats, absent/large response bodies, auth placeholders and DELETE approval against disposable endpoints.
 7. Verify a generated test refuses a production origin before contacting it; do not remove the guard to run against real production.
 8. Follow the full [demo script](DEMO_SCRIPT.md) using the downloaded ZIP and manual mode restart.
-9. Confirm that production build assets contain no remote scripts and that no optional AI behavior or telemetry is present.
+9. Confirm that production build assets contain no remote scripts or telemetry; optional integrations remain unavailable until pairing and explicit approvals.
 
-Not claimed: Chrome Web Store publication/review, personal-profile installation, cross-browser support, exhaustive accessibility certification, arbitrary application session replay, AI diagnostics or broad device/version coverage.
+Not claimed: Chrome Web Store publication/review, personal-profile installation, cross-browser support, exhaustive accessibility certification, arbitrary application session replay, live provider success or broad device/version coverage.
+
+## Companion and actual source-fix verification
+
+```bash
+npm run companion:check
+npm run test:fix-demo
+npm run test:browser:companion
+```
+
+Ubuntu execution tests require Bubblewrap, usable unprivileged namespaces, loopback binding and subprocess permissions. If the host blocks these, the production runner reports blocked; an inability to run the execution tests is not evidence of passing verification. Browser tests additionally require Playwright Chromium (`npx playwright install chromium`).
+
+The companion suite tests pairing, Host/origin/token/replay rejection, bounded requests, canonical workspaces, ignored/protected paths and symlinks, provider errors, grounding, patch constraints, stale hashes, safe staging, actual baseline/patched execution, no external network/host credential access, branch creation and publication approval gates. Temporary Git repositories isolate branch/commit tests. GitHub and Gemini use explicit test adapters; unit tests do not publish resources or contact the model.
+
+`test:fix-demo` applies a clearly labeled known fixture patch to a temporary source copy, executes the same generated regression against baseline and patched code, checks negative-amount rejection and one-time creation, and typechecks. Both executions call `createDemoApp('buggy')`; no mode flip creates the passing result. The baseline must fail specifically with expected 201 / received 422; all three patched tests and TypeScript must pass. It writes actual process logs and codes to `artifacts/fix-verification.json`. This validates the repair pipeline, not a live model's ability to choose the patch.
+
+The companion browser script includes the original real capture/export checks, pairs the actual extension to an actual local HTTP companion, previews source, approves mocked AI output, reviews/stages the real diff, runs real Bubblewrap verification and verifies the local-branch button becomes available only after success. It also approves an issue against the explicit GitHub fixture and checks its returned fixture URL. No external publication occurs. The disposable Chrome profile grants the declared optional host access via Chrome's settings API because native permission dialogs are not accessible to the CDP harness. The production client still calls the public permissions API. Test-only mocks/grant code are not bundled in the extension or exposed by the companion CLI.
+
+Evidence: `artifacts/browser-companion.txt`, `artifacts/companion-workflow.png`, and `artifacts/fix-verification.json`. Each browser run clears its previous success marker before starting.
+
+## Live-provider checks still requiring configuration and approval
+
+1. In a fresh personal test profile, pair through Chrome's real optional host permission prompt. Deny once, confirm offline capture still works, grant, then disconnect and confirm permission revocation.
+2. Configure an authorized Gemini key/model and `gh auth login`; select a dedicated repository containing committed synthetic demo source and a matching GitHub origin/base commit.
+3. Follow [DEMO_SCRIPT](DEMO_SCRIPT.md), reviewing the exact source before the model request. Confirm citations and edits correspond to the approved source. Reject inaccurate proposals.
+4. Review an issue draft and explicitly approve its real publication. Confirm the returned issue exists in the authorized repository.
+5. Verify an actual model-generated patch in isolation. Inspect real red/green and TypeScript outputs, then separately approve local commit, push and draft PR creation.
+6. Open the returned PR and compare its diff, base, head and verification description. No automatic merge or closure is permitted.
+
+These live operations have not been performed by the implementation tests. A configured model string is not proof of provider availability, and a mock issue/PR URL is not proof of a published resource.

@@ -11,11 +11,14 @@ import {
   Moon,
   ChevronRight,
 } from 'lucide-react';
+import { Settings as IntegrationSettings } from './features/integrations/Settings';
+import { Settings2 } from 'lucide-react';
 import { Inspector } from './components/Inspector';
 import type { CaptureBridge, Snapshot } from './features/network-capture/store';
 const empty: Snapshot = { records: [], paused: false, error: null };
 const noopSubscribe = () => () => {};
 export function App() {
+  const [showSettings, setShowSettings] = useState(false);
   const [bridge, setBridge] = useState<CaptureBridge | undefined>(
     window.__reproforge,
   );
@@ -60,9 +63,16 @@ export function App() {
             <Activity size={18} />
           </span>
           <strong>ReproForge</strong>
-          <span className="version">0.1</span>
+          <span className="version">0.2</span>
         </div>
         <div className="header-actions">
+          <button
+            className="icon-button"
+            aria-label="Integration settings"
+            onClick={() => setShowSettings(!showSettings)}
+          >
+            <Settings2 size={16} />
+          </button>
           <span
             className={`capture-status ${bridge && !snapshot.paused ? 'live' : ''}`}
           >
@@ -88,7 +98,13 @@ export function App() {
           the extension and open DevTools → ReproForge.
         </div>
       )}
-      <div className="workspace">
+      <div className="settings-view" hidden={!showSettings}>
+        <button onClick={() => setShowSettings(false)}>
+          Back to network monitor
+        </button>
+        <IntegrationSettings />
+      </div>
+      <div className={showSettings ? 'workspace is-hidden' : 'workspace'}>
         <aside className="monitor">
           <div className="monitor-heading">
             <div>
@@ -270,7 +286,7 @@ export function App() {
             <div className="welcome-note">
               <ShieldCheck size={15} />
               <span>
-                No traffic leaves this panel. No requests are replayed.
+                Capture stays local. Integrations share only approved data.
               </span>
             </div>
             <span className="demo-hint">

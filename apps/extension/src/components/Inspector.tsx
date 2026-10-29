@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ArrowUpRight, ShieldCheck, Clock, AlertTriangle } from 'lucide-react';
 import type { DiagnosticRecord, BodyPreview } from '@reproforge/shared';
 import { CodeBlock } from './CodeBlock';
+import { Workflow } from '../features/integrations/Workflow';
 import { TestBuilder } from '../features/test-builder/TestBuilder';
 const statuses: Record<number, string> = {
   400: 'Bad Request',
@@ -33,6 +34,18 @@ export function Inspector({
   onPreview: (id: string) => Promise<void>;
 }) {
   const [tab, setTab] = useState('Overview');
+  const [integrationView, setIntegrationView] = useState<
+    'AI Investigation' | 'Code Fix' | 'GitHub'
+  >('AI Investigation');
+  const chooseTab = (value: string) => {
+    setTab(value);
+    if (
+      value === 'AI Investigation' ||
+      value === 'Code Fix' ||
+      value === 'GitHub'
+    )
+      setIntegrationView(value);
+  };
   const [loading, setLoading] = useState(false);
   return (
     <section className="inspector" aria-label="Request inspector">
@@ -47,12 +60,20 @@ export function Inspector({
         <p className="muted mono">{record.url}</p>
       </div>
       <nav className="tabs" aria-label="Inspector tabs">
-        {['Overview', 'Request', 'Response', 'Test Builder'].map((t) => (
+        {[
+          'Overview',
+          'Request',
+          'Response',
+          'Test Builder',
+          'AI Investigation',
+          'Code Fix',
+          'GitHub',
+        ].map((t) => (
           <button
             key={t}
             aria-current={tab === t ? 'page' : undefined}
             className={tab === t ? 'active' : ''}
-            onClick={() => setTab(t)}
+            onClick={() => chooseTab(t)}
           >
             {t}
             {t === 'Test Builder' && <ArrowUpRight size={13} />}
@@ -110,6 +131,14 @@ export function Inspector({
               >
                 Build regression test <ArrowUpRight size={14} />
               </button>
+              <div className="action-row">
+                <button onClick={() => chooseTab('AI Investigation')}>
+                  Investigate with AI
+                </button>
+                <button onClick={() => chooseTab('GitHub')}>
+                  Create GitHub Issue
+                </button>
+              </div>
             </div>
             <h3>
               <ShieldCheck size={15} /> Privacy notes
@@ -165,6 +194,9 @@ export function Inspector({
             </div>
           </>
         )}
+        <div hidden={!['AI Investigation', 'Code Fix', 'GitHub'].includes(tab)}>
+          <Workflow record={record} view={integrationView} />
+        </div>
         <div hidden={tab !== 'Test Builder'}>
           <TestBuilder record={record} />
         </div>

@@ -6,12 +6,12 @@ Assume a page can return adversarial URLs, headers, HAR metadata and JSON bodies
 
 ## Data classes
 
-| Class                       | Handling                                                                                    |
-| --------------------------- | ------------------------------------------------------------------------------------------- |
-| Raw transient browser data  | Read inside the DevTools event callback, validated and discarded; no logging or persistence |
-| Sanitized local diagnostics | At most 150 records in DevTools memory; removed on Clear/close; bounded JSON previews       |
-| User-approved AI data       | No such data path exists in this MVP; no AI backend or egress                               |
-| Exported data               | A fresh validated/sanitized projection, explicitly reviewed and downloaded by the developer |
+| Class                       | Handling                                                                                                     |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Raw transient browser data  | Read inside the DevTools event callback, validated and discarded; no logging or persistence                  |
+| Sanitized local diagnostics | At most 150 records in DevTools memory; removed on Clear/close; bounded JSON previews                        |
+| User-approved AI data       | Explicitly reviewed sanitized failure and bounded source context, sent by the companion to configured Gemini |
+| Exported data               | A fresh validated/sanitized projection, explicitly reviewed and downloaded by the developer                  |
 
 Browser-owned data is distinct from extension state. Chrome still has its Network log, and Chrome API body getter handles can reference browser-owned responses. Clearing ReproForge is not clearing Chrome's Network log or disk cache.
 
@@ -45,14 +45,28 @@ An allowlist cannot establish that a host is truly a test system. Trusted local 
 
 ## Permissions and CSP
 
-There are **no declared permissions or host permissions**. The DevTools API works through the `devtools_page` entry; it requires no `tabs`, `debugger`, `webRequest`, cookies, storage or broad host permission for this feature. No service worker or content script is installed. Normal user-triggered Blob/anchor downloads and clipboard writes avoid additional permissions; failures are reported with selectable-text fallback for copying.
+There are **no required permissions or host permissions**. Optional `http://127.0.0.1/*` access is requested only when pairing with the companion. Chrome match patterns cover every loopback port; the client selects a validated port and the server validates Host. Disconnect revokes this optional permission. The DevTools API works through the `devtools_page` entry; it requires no `tabs`, `debugger`, `webRequest`, cookies, storage or broad host permission for this feature. No service worker or content script is installed. Normal user-triggered Blob/anchor downloads and clipboard writes avoid additional permissions; failures are reported with selectable-text fallback for copying.
 
-The production CSP permits only local scripts/styles, excludes object embedding and base URL changes, and sets `connect-src 'none'`. No `eval`, remote JavaScript, CDN fonts, inline application scripts or captured-HTML rendering are used. A Vite preview page is a development tool, not the packaged extension.
+The production CSP permits only local scripts/styles, excludes object embedding and base URL changes, and sets `connect-src http://127.0.0.1:*`. No `eval`, remote JavaScript, CDN fonts, inline application scripts or captured-HTML rendering are used. A Vite preview page is a development tool, not the packaged extension.
 
 ## Persistence and sharing
 
-No analytics, telemetry, external data sharing, raw-body logs or permanent diagnostic storage. Exported files are intentionally persistent downloads. Keep generated `.env` files out of Git and use test-only credentials. Downloads are under user control; deleting a capture does not delete prior exports. No API secrets exist in the frontend.
+No analytics, telemetry, raw-body logs or permanent diagnostic database. Explicitly approved context may be sent to Gemini; explicitly approved drafts and fix commits may be published to GitHub. Those providers apply their own retention policies. Pairing tokens and workflow state remain in memory. Approved staging creates temporary source copies; local Git branches and exports persist intentionally. Exported files are intentionally persistent downloads. Keep generated `.env` files out of Git and use test-only credentials. Downloads are under user control; deleting a capture does not delete prior exports. No API secrets exist in the frontend.
 
 ## Security regression checks
 
 Automated tests cover header/query redaction, nested/array/dynamic-key sanitization, malformed/unknown/large payloads, compile-safe literal escaping, production/path guards, DELETE opt-in, matching-status confirmation, missing-secret placeholders, ZIP integrity, bounded capture and response-preview handling. The red-to-green check executes real generated code. See [TESTING](TESTING.md) for evidence and remaining manual checks.
+
+## Companion, AI and Git boundaries
+
+See [LOCAL_COMPANION](LOCAL_COMPANION.md) for origin/Host checks, one-use pairing, token expiry, replay prevention, source limits and cleanup. A token is required even for origin-less Chrome GETs. The service trusts the local operating-system user and is not designed to resist a compromised host or same-user processes.
+
+Only the terminal-selected canonical Git root is accessible. Source discovery excludes ignored, hidden, secret, dependency, build and trust-boundary files, checks every path component for symlinks, and bounds reads. Source containing redacted secrets cannot be patched. Context expires after fifteen minutes; file hashes and base commit are rechecked before staging and promotion. Concurrent hostile filesystem replacement by the same OS user is outside this threat model.
+
+Repository content, captured responses, model text and GitHub content are data, never instructions granting permissions. Gemini gets no execution tools. Structured outputs must cite real approved source and supply bounded exact edits. Responses cannot change protected files or choose executable commands. Redaction is reapplied to model strings and outbound drafts, but cannot identify all confidential business logic; human review remains mandatory.
+
+The `demo-investments` profile executes fixed harnesses inside Bubblewrap, with private network/PID namespaces, read-only source and dependencies, no inherited provider credentials, output bounds, process-group timeouts and cancellation. Baseline and patched code both run in buggy mode. Missing namespace support blocks execution. This relies on the host kernel and trusted installed toolchain; it is not a multi-tenant security service. Other projects require a separately reviewed verification profile.
+
+Local promotion uses a private Git index and atomic creation of a new branch without checkout, reset or clean. Dirty proposed files block promotion; unrelated dirty files remain untouched. Hooks and external Git helpers are disabled except the fixed GitHub credential helper for an approved push. Remote repository/base/head are checked. No force-push, automatic merge or automatic issue closure exists. Publication has separate approval gates and uncertain submissions cannot be blindly retried.
+
+Audit records contain bounded operation metadata, not source or credentials. Verification logs are bounded and scrubbed before display. Temporary staging is removed on discard, disconnect and normal shutdown; abrupt termination can leave copies requiring manual cleanup. A local branch or published resource is never removed by disconnect.

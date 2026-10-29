@@ -933,3 +933,190 @@ details label:first-of-type {
 .review-dialog::backdrop {
   background: #0009;
 }
+/* ReproForge 2 integrations share the original theme tokens. */
+.is-hidden {
+  display: none !important;
+}
+.settings-view {
+  overflow: auto;
+  flex: 1;
+  padding: 22px;
+}
+.settings-view[hidden] {
+  display: none;
+}
+.settings-view > .integration-page {
+  max-width: 800px;
+  margin: 24px auto;
+}
+.integration-page {
+  min-width: 0;
+}
+.integration-page h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 22px 0 14px;
+}
+.integration-page button {
+  margin: 3px 6px 8px 0;
+}
+.integration-page details {
+  margin: 14px 0;
+}
+.integration-page summary {
+  padding: 9px 0;
+  overflow-wrap: anywhere;
+}
+.integration-page li {
+  margin: 8px 0;
+  line-height: 1.65;
+  color: var(--muted);
+}
+.integration-page ul {
+  padding-left: 18px;
+  list-style: disc;
+}
+.integration-top,
+.action-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.integration-top {
+  justify-content: space-between;
+  margin-bottom: 22px;
+}
+.form-columns {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 14px;
+  align-items: end;
+}
+.behavior-spec {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 14px;
+}
+.behavior-spec summary {
+  color: var(--text);
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+.command-example {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  padding: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font: 11px/1.7 monospace;
+}
+.source-preview,
+.diff-file,
+.finding {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin: 14px 0;
+  background: var(--surface);
+}
+.finding p {
+  line-height: 1.75;
+  margin-top: 12px;
+}
+.changed-files {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 14px 0;
+  font: 11px monospace;
+}
+.changed-files a,
+.resource-link {
+  color: var(--accent);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+.resource-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 16px 0;
+}
+.diff-code {
+  font: 11px/1.8 monospace;
+  overflow: auto;
+  max-height: 480px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--bg);
+}
+.diff-code > div {
+  display: flex;
+  white-space: pre;
+  min-width: fit-content;
+}
+.diff-added {
+  color: #a8d68c;
+  background: #243b242b;
+}
+.diff-removed {
+  color: #eea19b;
+  background: #6726242b;
+}
+.light .diff-added {
+  color: #32641d;
+  background: #dfedd6;
+}
+.light .diff-removed {
+  color: #9c2420;
+  background: #f8e2df;
+}
+.diff-context {
+  color: var(--muted);
+}
+.line-number {
+  display: inline-block;
+  flex-shrink: 0;
+  text-align: right;
+  width: 38px;
+  padding-right: 10px;
+  user-select: none;
+  color: var(--muted);
+  opacity: 0.65;
+}
+.before-after {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.before-after > div {
+  min-width: 0;
+}
+.tabs {
+  overflow-x: auto;
+}
+.tabs button {
+  white-space: nowrap;
+}
+.integration-page select[multiple] {
+  min-height: 95px;
+}
+.integration-page .review-dialog h2 {
+  margin: 0;
+}
+.integration-page .review-dialog button {
+  margin: 0;
+}
+@media (max-width: 850px) {
+  .before-after,
+  .form-columns {
+    grid-template-columns: 1fr;
+  }
+  .integration-top {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

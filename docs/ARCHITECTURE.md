@@ -1,6 +1,6 @@
 # Architecture
 
-ReproForge has two runtime surfaces: a packaged Chrome extension and an isolated demo server. There is no production backend or database.
+ReproForge has a packaged Chrome extension, a synthetic demo server and an optional local companion. There is no hosted backend or database. Existing capture and deterministic test export work without the companion.
 
 ```mermaid
 flowchart LR
@@ -55,3 +55,25 @@ Dependencies are installed at the workspace root and resolved through npm worksp
 `npm run build` checks TypeScript, builds both HTML entry points, then validates packaged assets and manifest references. `npm run package` puts the contents of `dist` directly at the ZIP root. Neither command installs or publishes the extension.
 
 Official references: [DevTools lifecycle](https://developer.chrome.com/docs/extensions/how-to/devtools/extend-devtools), [network events and body retrieval](https://developer.chrome.com/docs/extensions/reference/api/devtools/network), [MV3 CSP](https://developer.chrome.com/docs/extensions/reference/manifest/content-security-policy). The implementation uses supported callback forms in `chrome.*` for compatibility, rather than requiring the newer `browser.*` namespace.
+
+## Optional integration architecture
+
+```mermaid
+flowchart LR
+  P[DevTools panel] -->|Pairing and explicit approvals| C[Authenticated loopback companion]
+  C --> W[CLI-authorized Git workspace]
+  W --> R[Bounded sanitized context preview]
+  R -->|Approved context only| G[Gemini structured output]
+  G --> D[Validated grounded findings and exact diff]
+  D -->|Stage approval| S[Temporary source snapshots]
+  S -->|Execution approval| B[Bubblewrap baseline and patched checks]
+  B -->|Passing report and local approval| L[Separate local Git branch]
+  L -->|Push approval| H[GitHub branch]
+  C -->|Issue or PR draft approval| H
+```
+
+`packages/shared/src/integrations.ts` owns browser/server contracts. `apps/extension/src/features/integrations` owns the memory-only client, settings, approval dialogs and three contextual workflow views. No provider credentials enter that bundle. The manifest permits optional loopback transport only.
+
+`apps/companion/src/server.ts` validates sessions and approvals before routing operations. `workspace.ts` authorizes bounded source access; `ai.ts` handles Gemini schemas and evidence grounding; `patches.ts` validates/stages exact edits; `verification.ts` runs the fixed isolated profile; `github.ts` handles CLI API calls and frozen issue drafts; `branches.ts` handles private-index commits, approved pushes and draft PRs. `process.ts` enforces argv-only invocation, bounded execution and cancellation. See the companion, AI, GitHub and code-fix guides for the public workflows and failure behavior.
+
+State is single-process and bounded. Closing DevTools clears client state; disconnect/normal server shutdown clears companion state and temporary staging. Git branches and remote publications intentionally survive. There is no automatic source upload, background agent or autonomous retry of uncertain publications.

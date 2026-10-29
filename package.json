@@ -1,6 +1,6 @@
 {
   "name": "reproforge",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "workspaces": [
@@ -24,9 +24,16 @@
     "build": "npm run typecheck && npm run build -w @reproforge/extension && npm run verify:build",
     "verify:build": "node scripts/verify-build.mjs",
     "package": "npm run build && node scripts/package.mjs",
-    "check": "npm run typecheck && npm run lint && npm test && npm run build"
+    "check": "npm run typecheck && npm run lint && npm test && npm run build",
+    "companion:dev": "node --env-file-if-exists=apps/companion/.env --watch --import tsx apps/companion/src/cli.ts",
+    "companion:start": "node --env-file-if-exists=apps/companion/.env --import tsx apps/companion/src/cli.ts",
+    "companion:check": "npm run typecheck && vitest run apps/companion/tests",
+    "test:fix-demo": "tsx scripts/fix-demo.ts",
+    "test:browser:companion": "WITH_COMPANION=1 tsx scripts/browser-smoke.ts"
   },
   "dependencies": {
+    "@google/genai": "^2.32.0",
+    "diff": "^9.0.0",
     "express": "^5.3.0",
     "jszip": "^3.10.2",
     "lucide-react": "^1.64.0",
@@ -39,6 +46,7 @@
     "@playwright/test": "^1.64.1",
     "@tailwindcss/vite": "^4.3.3",
     "@types/chrome": "^0.3.7",
+    "@types/diff": "^7.0.2",
     "@types/express": "^5.0.6",
     "@types/node": "^26.6.6",
     "@types/react": "^19.3.0",

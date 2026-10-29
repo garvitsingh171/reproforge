@@ -5,11 +5,15 @@ import { tmpdir } from 'node:os';
 import { resolve, join } from 'node:path';
 import { once } from 'node:events';
 import type { AddressInfo } from 'node:net';
+import { live } from '../apps/companion/tests/helpers';
 import { createDemoApp } from '../apps/demo-api/src/app';
 
+const integration = process.env.WITH_COMPANION === '1' ? await live() : null;
 const artifacts = resolve('artifacts');
 await mkdir(artifacts, { recursive: true });
 await rm(join(artifacts, 'browser-smoke.txt'), { force: true });
+if (process.env.WITH_COMPANION === '1')
+  await rm(join(artifacts, 'browser-companion.txt'), { force: true });
 await rm(join(artifacts, 'browser-downloads/reproforge-regression.zip'), {
   force: true,
 });
@@ -190,7 +194,12 @@ try {
   const panel = async <T>(expression: string): Promise<T> => {
     const r = await send(
       'Runtime.evaluate',
-      { expression, returnByValue: true, awaitPromise: true },
+      {
+        expression,
+        returnByValue: true,
+        awaitPromise: true,
+        userGesture: true,
+      },
       panelSession,
     );
     if (r.exceptionDetails) throw new Error(JSON.stringify(r.exceptionDetails));
@@ -319,6 +328,116 @@ try {
       join(artifacts, 'devtools-smoke.png'),
       Buffer.from(String(screenshot.data), 'base64'),
     );
+  if (integration) {
+    const input = async (label: string, value: string) =>
+      panel(
+        `(()=>{const e=document.querySelector('[aria-label="'+${JSON.stringify(label)}+'"]');const proto=e.tagName==='TEXTAREA'?HTMLTextAreaElement.prototype:HTMLInputElement.prototype;Object.getOwnPropertyDescriptor(proto,'value').set.call(e,${JSON.stringify(value)});e.dispatchEvent(new Event('input',{bubbles:true}));})()`,
+      );
+    await panel(
+      "[...document.querySelectorAll('.request-row')].at(-1).click()",
+    );
+    await click('Integration settings');
+    await input('Companion port', new URL(integration.base).port);
+    await input('Pairing code', integration.pairingCode);
+    // Test-profile setup via Chrome's own extension settings API, not a mocked permission response.
+    // The native first-grant prompt remains a manual check in the user's Chrome profile.
+    const extensionId = await panel<string>('chrome.runtime.id');
+    const permissionsPage = await context.newPage();
+    await permissionsPage.goto('chrome://extensions');
+    await permissionsPage.evaluate(async (id) => {
+      const api = chrome as unknown as {
+        developerPrivate: {
+          addHostPermission: (
+            extensionId: string,
+            host: string,
+          ) => Promise<void>;
+        };
+      };
+      await api.developerPrivate.addHostPermission(id, 'http://127.0.0.1/*');
+    }, extensionId);
+    await permissionsPage.close();
+    await click('Pair local companion');
+    await expect
+      .poll(text, { timeout: 15000 })
+      .toContain('Local Companion Connected');
+    await click('Back to network monitor');
+    await click('AI Investigation');
+    await input('Integration expected status', '201');
+    await input(
+      'Intended outcome',
+      'A valid synthetic monthly investment should return 201.',
+    );
+    await click('Find relevant source files');
+    await expect.poll(text).toContain('apps/demo-api/src/app.ts');
+    await click('Investigate with AI');
+    await expect.poll(text).toContain('Send approved context to Gemini');
+    await panel(
+      "document.querySelector('dialog input[type=checkbox]').click()",
+    );
+    await panel(
+      "[...document.querySelectorAll('dialog button')].find(e=>e.textContent.trim()==='Investigate with AI').click()",
+    );
+    await expect.poll(text).toContain('Investigation complete');
+    await click('Code Fix');
+    await click('Generate Fix');
+    await panel(
+      "document.querySelector('dialog input[type=checkbox]').click()",
+    );
+    await panel(
+      "[...document.querySelectorAll('dialog button')].find(e=>e.textContent.trim()==='Generate Fix').click()",
+    );
+    await expect.poll(text).toContain('Remove the invalid monthly rejection');
+    await click('Stage in Sandbox');
+    await panel(
+      "document.querySelector('dialog input[type=checkbox]').click()",
+    );
+    await panel(
+      "[...document.querySelectorAll('dialog button')].find(e=>e.textContent.trim()==='Stage in Sandbox').click()",
+    );
+    await expect.poll(text).toContain('staged');
+    await click('Run Verification');
+    await expect.poll(text).toContain('Run isolated verification');
+    await panel(
+      "document.querySelector('dialog input[type=checkbox]').click()",
+    );
+    await panel(
+      "[...document.querySelectorAll('dialog button')].find(e=>e.textContent.trim()==='Run Verification').click()",
+    );
+    await expect
+      .poll(text, { timeout: 30000 })
+      .toContain('Verification: passed');
+    await expect
+      .poll(() =>
+        panel<boolean>(
+          "[...document.querySelectorAll('button')].find(b=>b.textContent.trim()==='Apply to Local Branch').disabled",
+        ),
+      )
+      .toBe(false);
+    const shot = await send('Page.captureScreenshot', { format: 'png' });
+    await writeFile(
+      join(artifacts, 'companion-workflow.png'),
+      Buffer.from(String(shot.data), 'base64'),
+    );
+    await click('GitHub');
+    await input('GitHub repository', 'example/demo');
+    await click('Check connection & repository');
+    await expect.poll(text).toContain('fixture-account');
+    await click('Create GitHub Issue');
+    await expect.poll(text).toContain('Issue title');
+    await click('Review issue for publication');
+    await expect.poll(text).toContain('Publish GitHub issue');
+    await panel(
+      "document.querySelector('dialog input[type=checkbox]').click()",
+    );
+    await panel(
+      "[...document.querySelectorAll('dialog button')].find(e=>e.textContent.trim()==='Create Issue').click()",
+    );
+    await expect.poll(text).toContain('Open issue #42 in GitHub');
+    await writeFile(
+      join(artifacts, 'browser-companion.txt'),
+      'PASS: real extension pairing, source preview, approval controls, patch diff, isolated red/green verification and issue UI. Gemini/GitHub use explicit test adapters; no external issue or AI request was made.\n',
+    );
+  }
   await click('Clear requests');
   await expect.poll(text).toContain('Waiting for a failure');
   const emptyShot = await send('Page.captureScreenshot', { format: 'png' });
@@ -334,5 +453,6 @@ try {
   socket.close();
 } finally {
   await context?.close();
+  await integration?.close();
   await new Promise<void>((done) => server.close(() => done()));
 }

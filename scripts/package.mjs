@@ -13,9 +13,9 @@ async function add(dir) {
 await add(root);
 await mkdir('artifacts', { recursive: true });
 await writeFile(
-  'artifacts/reproforge-0.1.0.zip',
+  'artifacts/reproforge-0.2.0.zip',
   await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' }),
 );
 console.log(
-  'Created artifacts/reproforge-0.1.0.zip with manifest.json at ZIP root. Not published.',
+  'Created artifacts/reproforge-0.2.0.zip with manifest.json at ZIP root. Not published.',
 );

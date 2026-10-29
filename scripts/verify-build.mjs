@@ -37,5 +37,11 @@ for (const name of await readdir(path.join(root, 'assets'))) {
 }
 if (!scripts || !styles) throw new Error('Missing application assets');
 console.log(
-  `Verified MV3 manifest, both HTML entries, ${scripts} JS bundles, ${styles} CSS bundle, four PNG icons, no remote scripts or permissions.`,
+  `Verified MV3 manifest, both HTML entries, ${scripts} JS bundles, ${styles} CSS bundle, four PNG icons, no remote scripts or required permissions (optional loopback access only).`,
 );
+
+if (
+  JSON.stringify(manifest.optional_host_permissions) !==
+  JSON.stringify(['http://127.0.0.1/*'])
+)
+  throw new Error('Unexpected optional host permissions');

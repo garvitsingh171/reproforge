@@ -1,14 +1,14 @@
-# ReproForge
+# ReproForge 2.0
 
 **Capture. Reproduce. Prevent.**
 
-A Chrome DevTools extension that turns failed API requests into developer-approved, executable regression tests. Select a captured HTTP failure, specify the expected status, review sanitized inputs, and download a standalone Vitest project. The extension never replays requests or runs tests.
+ReproForge is a Chrome DevTools extension that captures failed API requests, sanitizes their details, and exports developer-approved regression tests. Version 0.2.0 adds a local companion for GitHub issues, Gemini source investigation, minimal code patches, isolated verification, and separately approved fix branches and draft PRs.
 
-For example, the included demo rejects a valid monthly investment with **422**. You specify **201**, export a test, observe it fail against the buggy server, then run the same test against the corrected server and watch it pass.
+The original capture/test workflow still works offline without the companion. Integrations do not automatically publish, upload code, execute a patch, or modify your working files.
 
-## Quick start
+## Install and launch the original workflow
 
-Use Node.js **22.13+ or 24 LTS** (Node 24 LTS recommended) and npm. Current Vite/Vitest/ESLint dependencies require a newer runtime than early Node 20 releases. The lockfile pins the dependency graph.
+Use **Node 24 LTS** and npm on Ubuntu. The dependency lockfile is included; use `npm ci` for repeatable installs.
 
 ```bash
 npm ci
@@ -16,181 +16,140 @@ npm run build
 npm run demo:buggy
 ```
 
-In Chrome on Ubuntu:
+1. Open `chrome://extensions`, enable **Developer mode**, and **Load unpacked** → `apps/extension/dist`.
+2. Open `http://127.0.0.1:4317` and DevTools → **ReproForge** (possibly under `»`).
+3. Submit the synthetic investment. Select its real `POST /api/investments` **422** failure.
+4. Open **Test Builder**, supply expected status **201**, review exact exported files, and download the ZIP.
+5. In the extracted project run `npm install`, copy `.env.example` to `.env`, set `TEST_BASE_URL=http://127.0.0.1:4317`, and run `npm run typecheck` followed by `npm test`.
+6. The test fails against buggy mode. Stop that server, run `npm run demo:fixed`, and rerun the **unchanged** exported test: it passes.
 
-1. Open `chrome://extensions` and enable **Developer mode**.
-2. Choose **Load unpacked** and select `apps/extension/dist` inside this repository.
-3. Open `http://127.0.0.1:4317`.
-4. Open DevTools with **F12** or **Ctrl+Shift+I**, then choose **ReproForge** (possibly in the `»` overflow menu).
-5. Submit the synthetic investment on the demo page. Select the captured `POST /api/investments` with status **422**.
-6. Choose **Test Builder**, enter expected status **201**, and select **Review & export bundle**.
-7. Inspect the exact sanitized inputs and bundle files, approve the export, and download the ZIP.
+DevTools must be open to capture; earlier requests may be unavailable. Capture is scoped to the inspected tab's completed fetch/XHR HTTP 400–599 responses. It is not browser-wide monitoring or JavaScript error capture. Closing DevTools discards the capture session.
 
-DevTools must be open to capture. Requests completed before it opened may not be available. Capture continues while another DevTools panel is visible. Closing DevTools discards the session. After rebuilding, reload the extension on `chrome://extensions`, close DevTools, and reopen it.
+## Enable the companion
 
-## Run your exported test
-
-Extract the ZIP into a separate directory, then:
+The companion is necessary because a DevTools extension cannot directly read arbitrary local repositories. It exposes a bounded, authenticated API, not a shell endpoint.
 
 ```bash
-npm install
-cp .env.example .env
+# Install these OS tools if needed; follow your organization's package policy.
+sudo apt install gh bubblewrap
+
+# Authenticate GitHub independently. ReproForge never asks for a password.
+gh auth login --hostname github.com
+gh auth status --hostname github.com
+
+# Optional Gemini setup; keep this file out of Git.
+cp apps/companion/.env.example apps/companion/.env
 ```
 
-Set this value in that directory's `.env`:
+Set `GEMINI_API_KEY` and `GEMINI_MODEL` in `apps/companion/.env`. Select a currently supported model from your Gemini account; no model is silently hardcoded. Missing credentials, unavailable models, rate limits and timeouts produce explicit errors. The key remains in the companion process.
 
-```dotenv
-TEST_BASE_URL=http://127.0.0.1:4317
-```
-
-Then:
+Authorize a repository root explicitly:
 
 ```bash
-npm run typecheck
-npm test
+npm run companion:start -- --workspace /absolute/path/to/repository --verification demo-investments
 ```
 
-With `npm run demo:buggy` running in the repository, the test **must fail** with expected HTTP 201 / actual HTTP 422. Stop that server with Ctrl+C and run:
+For this checkout, `/absolute/path/to/repository` is the ReproForge Git root. The demo profile expects `apps/demo-api/src/app.ts` and its `createDemoApp` export. For other repositories, omit `--verification demo-investments`: discovery, investigation, patch review, staging and export remain available, while execution is blocked until an appropriate trusted profile exists.
 
-```bash
-npm run demo:fixed
-```
+The companion prints a single-use pairing code valid for five minutes. In the extension's **Settings** button:
 
-Run `npm test` in the **same exported directory** again. The **unchanged test passes** with HTTP 201. Do not change the expected status to match the bug. Both modes use synthetic data and hold no persistent records. State-changing tests against other APIs may require disposable fixtures and cleanup.
+1. Enter the companion port (default **4318**) and pairing code.
+2. Click **Pair local companion** and approve Chrome's optional loopback access request.
+3. Confirm the authorized workspace and connection status.
 
-## Features
+The token remains only in panel memory. Disconnect clears companion session data and staged copies; restart the companion for a new code. No extension ID is hardcoded, so unpacked development IDs can change. [Local companion details](docs/LOCAL_COMPANION.md).
 
-- Genuine `chrome.devtools.network.onRequestFinished` capture of completed fetch/XHR HTTP 400–599 failures.
-- Compact dark interface, light theme, status/method/search filters, request order, selection, pause/resume and clear.
-- Up to 150 in-memory records. Duplicate delivery of the same event object is ignored; separate identical requests remain separate.
-- Request metadata and sanitized JSON previews. Response previews load only on demand, subject to type and size checks.
-- Deterministic TypeScript/Vitest tests with native fetch and a developer-specified status assertion.
-- GET/HEAD/OPTIONS without bodies; POST/PUT/PATCH JSON; DELETE only with explicit generation approval.
-- Environment placeholders for authentication, excluded paths and missing/redacted fixtures.
-- Review and download of a complete ZIP, including the test, target guard, package metadata, configuration and setup instructions.
-- No account, backend, AI key, analytics, remote scripts or external sharing required.
+## Browser failure → reviewed fix
 
-## Repository layout
+Select a captured request and use the new tabs:
+
+- **GitHub:** confirm an owner/repository, check account and repository access, enter expected behavior, prepare/edit an issue, review its exact final title/body and confirm **Create Issue**. Only a confirmed GitHub response produces a success link. Existing issue suggestions are fetched without sending the captured title to a search endpoint.
+- **AI Investigation:** enter expected behavior, find relevant source, optionally choose up to six tracked files, inspect exact sanitized context, and approve **Investigate with AI**. Source matching is heuristic; findings are hypotheses with checked file/line quotations.
+- **Code Fix:** approve the second Gemini request, review per-file diffs and before/after source, reject/regenerate/download, then approve **Stage in Sandbox**. Only an isolated copy changes.
+- **Run Verification:** inspect the fixed execution plan and approve it. The demo profile runs the same generated test against original and patched code with `DEMO_MODE=buggy` in **both**, plus invalid-input/one-time-investment tests and TypeScript. It never substitutes a mode toggle for source repair.
+- **Apply to Local Branch:** after a passed verification, approve creating a separate local branch and commit. Git plumbing uses a private index; your current branch and working files remain untouched. Uncommitted target-file edits block promotion.
+- **GitHub → Create Fix PR:** approve pushing the reviewed fix branch, then separately review and approve opening a draft PR. No force-push, direct push to the base branch, merge or automatic issue closure is provided.
+
+[AI investigation](docs/AI_INVESTIGATION.md) · [Code-fix workflow](docs/CODE_FIX_WORKFLOW.md) · [GitHub setup](docs/GITHUB_INTEGRATION.md) · [Complete demo script](docs/DEMO_SCRIPT.md).
+
+## Repository structure
 
 ```text
 apps/
   extension/
-    public/                 # Manifest V3 and original PNG icons
-    src/
-      devtools/             # Hidden DevTools page: capture + panel registration
-      components/           # Request inspector and escaped code preview
-      features/
-        network-capture/    # HAR normalization and bounded capture store
-        test-builder/       # Expected behavior, input editing, review/export
-      lib/                  # Browser download helper and bridge types
-      styles/               # Tailwind entry and panel styles
-    devtools.html
-    panel.html
-    vite.config.ts
-  demo-api/
-    src/                    # Express app and loopback-only launcher
-    public/                 # Synthetic investment demo
+    public/manifest.json, icons/
+    src/devtools/                    # Public Chrome API integration
+    src/features/network-capture/    # Sanitized, bounded in-memory records
+    src/features/test-builder/       # Deterministic tests and ZIP review
+    src/features/integrations/       # Pairing, AI, diff and GitHub UI
+    src/components/, styles/, lib/
+  demo-api/                          # Existing synthetic webpage and Express API
+  companion/
+    src/                             # Auth, workspace, GitHub, Gemini, patches,
+                                     # Bubblewrap verification and branch/PR operations
+    tests/                           # Security, provider, Git, execution tests
 packages/
-  shared/                   # Types, Zod validation, conservative sanitization
-  test-generator/           # Typed deterministic templates and ZIP generation
-tests/                      # Capture and demo integration tests
-scripts/                    # Build validation, packaging, red/green, browser checks
-docs/                       # Architecture, security, demo, testing, store checklist
-artifacts/                  # Generated evidence and ZIPs (ignored by Git)
+  shared/                            # Capture types/sanitizer + integration Zod contracts
+  test-generator/                    # Existing deterministic Vitest templates
+scripts/                             # Build, packaging, red/green and browser checks
+docs/                                # Architecture, security, setup, demo and verification
+artifacts/                           # Generated reports, screenshots and ZIPs; Git-ignored
 ```
 
-React 19 + TypeScript strict mode + Vite 8 + Tailwind 4 + Lucide make the panel. React's `useSyncExternalStore` subscribes to a tiny bounded store; no global state framework is necessary. Zod validates inputs. JSZip builds downloadable projects. Express 5 serves the local demo. Vitest 5, TypeScript, ESLint and Prettier support verification. Exact versions are in `package-lock.json`.
+React 19, TypeScript strict mode, Vite 8, Tailwind 4, Lucide and `useSyncExternalStore` power the panel. Express 5, Zod, the official `@google/genai` SDK, maintained `diff` parser, controlled Git/`gh` processes and Bubblewrap power integrations. No database, authentication platform, hosted backend or Docker is required.
 
 ## Commands
 
-Run these from the repository root:
+| Command                                        | Purpose                                                                                                         |
+| ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `npm run dev`                                  | Ordinary browser UI preview at `/panel.html`; capture/pairing require the installed extension                   |
+| `npm run demo:buggy` / `npm run demo:fixed`    | Existing local test-generator demonstration                                                                     |
+| `npm run companion:start -- --workspace /repo` | Companion with explicit workspace and execution disabled                                                        |
+| `npm run companion:dev -- --workspace /repo`   | Watch-mode companion; restarting invalidates sessions                                                           |
+| `npm run companion:check`                      | Typecheck and companion tests, including Bubblewrap checks                                                      |
+| `npm run typecheck` / `npm run lint`           | Static checks                                                                                                   |
+| `npm run format` / `npm run format:check`      | Apply/check Prettier                                                                                            |
+| `npm test`                                     | Original and companion suites; external providers mocked                                                        |
+| `npm run test:red-green`                       | Original generated-test demo with mode switching                                                                |
+| `npm run test:fix-demo`                        | Actual source patch and isolated red/green checks using an explicitly labeled test fixture, **not live Gemini** |
+| `npm run test:browser`                         | Real Chromium capture, inspection and ZIP export                                                                |
+| `npm run test:browser:companion`               | Real browser pairing, approval, diff, sandbox verification and issue UI; external providers use test adapters   |
+| `npm run build` / `npm run verify:build`       | Production build / manifest and asset checks                                                                    |
+| `npm run package`                              | `artifacts/reproforge-0.2.0.zip`, with manifest at ZIP root                                                     |
+| `npm run check`                                | Typecheck, lint, tests and build                                                                                |
 
-| Command                                   | Purpose                                                          |
-| ----------------------------------------- | ---------------------------------------------------------------- |
-| `npm run dev`                             | Vite UI preview; open `/panel.html` on the printed localhost URL |
-| `npm run demo:buggy`                      | Synthetic demo on 127.0.0.1:4317, intentionally returns 422      |
-| `npm run demo:fixed`                      | Same demo with correct 201 response                              |
-| `npm run typecheck`                       | Strict TypeScript check across workspaces and scripts            |
-| `npm run lint`                            | ESLint                                                           |
-| `npm run format` / `npm run format:check` | Apply / check Prettier formatting                                |
-| `npm test`                                | Sanitization, generator, capture and demo integration tests      |
-| `npm run test:red-green`                  | Compile and execute one generated test against both modes        |
-| `npm run test:browser`                    | Real Chromium extension workflow; see browser setup below        |
-| `npm run build`                           | Typecheck, production extension build and asset validation       |
-| `npm run verify:build`                    | Validate an existing extension build                             |
-| `npm run package`                         | Build and create `artifacts/reproforge-0.1.0.zip`                |
-| `npm run check`                           | Typecheck, lint, tests, build                                    |
+For browser tests, first run `npx playwright install chromium`. Tests use an isolated browser profile. The companion browser test grants only the declared loopback permission through Chrome's own settings API; the native first-grant prompt is a separate manual release check.
 
-Vite's normal browser preview explicitly reports **Preview mode** and does not pretend to capture traffic. The installable extension uses only bundled production assets. No Vite development server is necessary after building.
+## Security boundaries
 
-For browser automation:
+- No required extension permissions or required host access. Optional `http://127.0.0.1/*` is requested only for pairing. Chrome match patterns cannot limit that grant to one port; the client and companion validate the selected port, Host and authenticated session. CSP permits only loopback connections, not GitHub/Gemini directly.
+- Capture still removes origins, credentials, query values and unrecognized sensitive fields. Only bounded JSON previews are retained; response bodies load on demand.
+- The companion binds only `127.0.0.1`, checks Host and extension origin, requires a random expiring session token and fresh request IDs, and rejects replayed writes. Chrome's origin-less privileged GETs require a matching explicit extension-origin header and session token; normal web origins remain blocked.
+- Workspace access is CLI-authorized, canonicalized, tracked-file-only, bounded and symlink checked. Secrets, dependency directories, build artifacts, hidden files and deployment/companion trust-boundary paths are excluded.
+- AI receives only reviewed context. It has no execution tools. Outputs must match schemas, real source quotations, exact file hashes and bounded minimal edits.
+- Verification uses Bubblewrap with private network/PID namespaces, no inherited credentials, read-only source/dependencies, fixed commands, bounded output, timeout and cancellation. If isolation is unavailable, application code does **not** run.
+- Source snapshots are local temporary files created after staging approval, removed on discard/disconnect/normal shutdown. Unexpected termination can leave them in `/tmp`; see the cleanup guidance.
+- External publications require exact draft review. Uncertain results are not blindly retried. Git operations do not reset, clean, check out over, or overwrite your working tree.
 
-```bash
-npx playwright install chromium
-npm run build
-npm run test:browser
-```
+Redaction is conservative, not perfect. Business data and source code can remain confidential even without recognizable secret patterns. Review outbound content and use synthetic data. [Full security policy](docs/SECURITY.md).
 
-The script uses an isolated temporary profile, the full Chromium browser, a loopback demo server and actual DevTools APIs. If headless DevTools is unavailable on your system, use `HEADED=1 npm run test:browser` under a desktop session. It does not use your normal Chrome profile. See [testing details](docs/TESTING.md).
+## Verification and limits
 
-## How a DevTools extension works
+The original workflow and the companion browser workflow have been tested in actual Chromium. Automated tests exercise real isolated source repair and branch creation in temporary repositories. GitHub and Gemini use explicit test adapters in automation: **no live Gemini success, real issue publication, remote push or real PR creation is claimed**. Those require your credentials, an authorized repository, approved source context and explicit UI approvals.
 
-`manifest.json` is Chrome's entry-point declaration: extension name/version, packaged icons, a DevTools HTML page, and a restrictive Content Security Policy. This extension declares **zero permissions and zero host permissions**. The `devtools_page` manifest entry grants the supported DevTools integration; there is no service worker, popup or content script.
+Execution currently supports the documented Express investment demo profile. Generic Node/TypeScript source discovery is heuristic; arbitrary frameworks, databases, browser sessions, multipart/binary replay and arbitrary project scripts are unsupported. A passing status assertion is limited evidence, not proof of complete application correctness. This is a single-user local developer tool, not a multi-tenant hardened execution service.
 
-When DevTools opens, Chrome creates the hidden `devtools.html` page. It registers a **ReproForge** panel and listens to completed network requests for the inspected tab. This is where `chrome.devtools` is available; those APIs are not available in an ordinary React webpage. When the panel is shown, a small same-extension bridge connects React to the capture store. A hidden panel can reopen without losing the current DevTools session.
+Before presenting, perform the native Chrome install/permission checks and the live-provider steps in [TESTING](docs/TESTING.md). Useful next additions are reviewed framework-specific verification profiles, a GitHub App authorization model and richer domain assertions.
 
-Capture normalizes supported HAR entries and discards unnecessary fields immediately. Chrome retains its own Network data; ReproForge does not control Chrome's storage. [Architecture](docs/ARCHITECTURE.md) explains the boundaries.
+## Troubleshooting and packaging
 
-## Privacy, sanitization and permissions
+- **No failures:** open DevTools before triggering the request, resume capture and clear filters. Network status 0, cancellation and CORS-only errors are outside HTTP capture.
+- **Pairing unavailable:** restart the companion, use its new code within five minutes, verify port and approve optional loopback permission. Only one extension session is allowed per companion process.
+- **Source missing:** use the Git root and tracked, non-ignored regular source files. Select known files manually. Protected/oversized/secret-bearing files cannot be patched.
+- **Verification blocked:** install/configure Bubblewrap and unprivileged namespaces; otherwise export and verify manually in a separately controlled environment. Do not fall back to host execution.
+- **GitHub failed:** check `gh auth status`, repository issue settings/access and rate limits. After a timeout, inspect GitHub before preparing another submission.
+- **Stale patch/base:** regenerate from current source; do not force-apply or force-push.
+- **Missing Git identity:** configure a repository-local `user.name` and `user.email` yourself before creating a local commit.
+- **Changes not visible:** rebuild, reload the extension on `chrome://extensions`, close/reopen DevTools, and re-pair if needed.
 
-- Raw network data arrives transiently from Chrome. Application state contains sanitized diagnostic records, not raw HAR entries.
-- All captured URL query parameters, credentials, fragments and origins are removed. Unknown path segments become `__REDACTED__`; configure a synthetic `TEST_PATH` after export.
-- Only approved MIME headers survive. Authorization, Cookie, Set-Cookie, API keys and arbitrary headers are excluded.
-- JSON fields use conservative allowlists. Sensitive/unknown properties, emails, phones and opaque strings are redacted; nested objects and arrays are bounded. Unknown keys are replaced too, because keys can contain personal data.
-- Only bounded JSON previews are supported. Malformed JSON, free text, binary, multipart/form bodies and unknown/large responses are excluded. The UI explains unavailable data.
-- Nothing is persisted by ReproForge. Clear capture or close DevTools to release the session. User-requested downloads are persistent files under your control.
-- Export shows exact files and requires review. You can cancel and remove fixture fields or safe headers. Generation sanitizes again. Replace placeholders using synthetic fixtures and test-only credentials outside the extension.
-- The extension never makes API calls, replays mutations, follows captured links, or runs tests. Its CSP includes `connect-src 'none'`.
-- Tests require `TEST_BASE_URL`, default to exact loopback hosts, and block redirects. Explicit HTTPS `.test` sandbox origins must also be listed in `TEST_ALLOWED_ORIGINS`. This is not permission to use a production proxy or production data.
-
-Sanitization cannot identify every sensitive business value. Even an allowed short `symbol` or numeric `amount` can be confidential. Review is mandatory; use synthetic data. See [the threat model and limits](docs/SECURITY.md).
-
-## Optional Gemini diagnostics
-
-**Not implemented in this MVP.** There is no AI backend, AI request button, external sharing path, or frontend secret. Capture and test generation work offline after installation. A future integration would need a separate backend with a server-only Gemini key, user approval of exact sanitized content, validated advisory output, timeout/rate-limit handling, and a narrowly scoped opt-in connection. It must not change deterministic generation or claim a verified root cause.
-
-## Limits and troubleshooting
-
-| Symptom                                        | Explanation / action                                                                                                                        |
-| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| ReproForge is missing                          | Select `apps/extension/dist`, not the source directory. Reopen DevTools; check `»`.                                                         |
-| No captured requests                           | Open DevTools before submitting. Resume capture. Clear filters. Only completed fetch/XHR 400–599 responses are included.                    |
-| Network shows an error but ReproForge does not | Cancellations, CORS failures and network status 0 are not HTTP response failures and are outside this MVP.                                  |
-| Preview is unavailable                         | Chrome may not retain the body, or its type/size is unsupported. Unknown sizes are excluded.                                                |
-| Body fields disappeared                        | Conservative sanitization excluded them. Configure a complete synthetic `TEST_FIXTURE_JSON` in the export.                                  |
-| Expected status is blank                       | Intent cannot be inferred from a failure; supply it explicitly. Matching the observed status requires a separate acknowledgment.            |
-| Unsafe target blocked                          | Set a loopback origin or an explicitly allowlisted HTTPS `.test` origin. Do not remove the guard to run against production.                 |
-| Test reports missing configuration             | Read `.env.example`; provide test fixture, path or token placeholders when required.                                                        |
-| Port 4317 is busy                              | Stop the previous demo. Alternatively use `PORT=4318 npm run demo:buggy` and update `TEST_BASE_URL`.                                        |
-| Changes are not visible in Chrome              | Build, reload the extension, close and reopen DevTools.                                                                                     |
-| ZIP or copy fails                              | Retry; check browser download/clipboard controls. Code previews are selectable. No `downloads` or `clipboardWrite` permission is requested. |
-
-A single HTTP request cannot recreate a session. Cookie-based flows, uploads, binary content, GraphQL assertions, streaming responses and complex setup are not supported. GET/HEAD/OPTIONS body replay is not supported. A generated status assertion is narrower than full business validation. The code preview is escaped plain text, not syntax-highlighted HTML.
-
-## Packaging and judging
-
-`npm run package` creates a Chrome Web Store-shaped ZIP with `manifest.json` at its root. It is **not published** and does not include a store listing. See [the store checklist](docs/CHROME_WEB_STORE.md).
-
-| Criterion                | Concrete implementation                                                                                          |
-| ------------------------ | ---------------------------------------------------------------------------------------------------------------- |
-| Real browser interaction | DevTools receives an actual failed POST from the local demo                                                      |
-| Useful result            | Runnable Vitest ZIP, with the same test failing before the fix and passing afterward                             |
-| Permission minimization  | No declared permissions, host access, content scripts or background service worker                               |
-| Secure handling          | Conservative sanitization, bounded memory, explicit review, target guard, no network egress                      |
-| User benefit             | Converts captured API errors into developer-approved regression tests without manually assembling a test project |
-
-For an honest time comparison, time manual test creation and the assisted workflow using the same endpoint, payload, expected status, machine and warm dependency cache. Include review/configuration in both measurements; repeat and report raw times and medians. No speedup or saved-time benchmark is claimed here.
-
-Read [DEMO_SCRIPT](docs/DEMO_SCRIPT.md), [TESTING](docs/TESTING.md), [SECURITY](docs/SECURITY.md), and [ARCHITECTURE](docs/ARCHITECTURE.md) for details.
-
-Implementation references: [Chrome DevTools architecture](https://developer.chrome.com/docs/extensions/how-to/devtools/extend-devtools), [DevTools network API](https://developer.chrome.com/docs/extensions/reference/api/devtools/network), [Manifest V3 CSP](https://developer.chrome.com/docs/extensions/reference/manifest/content-security-policy), [Vite runtime requirements](https://vite.dev/guide/), [Playwright extension testing](https://playwright.dev/docs/chrome-extensions).
+`npm run package` creates a ZIP; it does not install or publish it. [Chrome Web Store checklist](docs/CHROME_WEB_STORE.md).
